@@ -28,6 +28,7 @@ const allowedOrigins = [
 if (process.env.VERCEL_URL) {
     allowedOrigins.push(`https://${process.env.VERCEL_URL}`);
 }
+// At the bottom of your app.js
 
 const corsOptions = {
     origin: function (origin, callback) {
@@ -127,5 +128,10 @@ if (process.env.NODE_ENV !== 'production') {
         console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
     });
 }
+
+if (require.main === module) {
+    app.listen(3000, () => console.log("Server running on port 3000"));
+  }
+  
 
 module.exports = app;
