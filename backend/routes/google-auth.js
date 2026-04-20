@@ -5,12 +5,24 @@ const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const jwt = require('jsonwebtoken');
 const db = require('../db');
 
+// Dynamic URLs - Works for both Local and Production
+const BACKEND_URL = process.env.NODE_ENV === 'production' 
+  ? 'https://book-elien-backend.vercel.app' 
+  : 'http://localhost:3041';
+
+const FRONTEND_URL = process.env.NODE_ENV === 'production' 
+  ? 'https://book-elien.vercel.app' 
+  : 'http://localhost:3020';
+
+console.log('🔧 Google OAuth Config - Backend:', BACKEND_URL);
+console.log('🔧 Google OAuth Config - Frontend:', FRONTEND_URL);
+
 passport.use(
   new GoogleStrategy(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: 'http://localhost:3041/users/auth/google/callback',
+      callbackURL: `${BACKEND_URL}/users/auth/google/callback`,
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
@@ -27,15 +39,11 @@ passport.use(
              VALUES ($1, $2, $3, $4, NOW()) RETURNING *`,
             [name, email, googleId, avatar]
           );
-          console.log('✅ New Google user created:', email);
-        } else {
-          if (!result.rows[0].google_id) {
-            await db.query(
-              'UPDATE users SET google_id = $1, avatar = $2 WHERE email = $3',
-              [googleId, avatar, email]
-            );
-          }
-          console.log('✅ Existing user logged in via Google:', email);
+        } else if (!result.rows[0].google_id) {
+          await db.query(
+            'UPDATE users SET google_id = $1, avatar = $2 WHERE email = $3',
+            [googleId, avatar, email]
+          );
         }
 
         return done(null, result.rows[0]);
@@ -50,19 +58,18 @@ passport.use(
 passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((user, done) => done(null, user));
 
-router.get(
-  '/auth/google',
-  passport.authenticate('google', {
-    scope: ['profile', 'email'],
-    prompt: 'select_account',
-  })
-);
+// Google Login Route
+router.get('/auth/google', passport.authenticate('google', {
+  scope: ['profile', 'email'],
+  prompt: 'select_account',
+}));
 
+// Google Callback Route
 router.get(
   '/auth/google/callback',
   passport.authenticate('google', {
     session: false,
-    failureRedirect: 'http://localhost:3020/auth/login-form?error=google_failed', // ✅ 3020
+    failureRedirect: `${FRONTEND_URL}/auth/login-form?error=google_failed`,
   }),
   (req, res) => {
     const user = req.user;
@@ -83,7 +90,7 @@ router.get(
     };
 
     res.redirect(
-      `http://localhost:3020/auth/google-callback?token=${accessToken}&user=${encodeURIComponent(JSON.stringify(userProfile))}` // ✅ 3020
+      `${FRONTEND_URL}/auth/google-callback?token=${accessToken}&user=${encodeURIComponent(JSON.stringify(userProfile))}`
     );
   }
 );
